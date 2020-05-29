@@ -11,6 +11,7 @@ RUN apt-get update \
   && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       gnupg \
       dirmngr \
+      unzip \
       wget \
   && apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 3FA7E0328081BFF6A14DA29AA6A19B38D3D831EF \
   && echo "deb http://download.mono-project.com/repo/debian stable-stretch main" > /etc/apt/sources.list.d/mono-official-stable.list \
@@ -30,7 +31,7 @@ RUN apt-get update \
 ARG OVM_REPOSITORY_OWNER=oscript-library
 ARG OVM_VERSION=v1.0.0-RC15
 ARG ONESCRIPT_VERSION=dev
-ARG ONESCRIPT_PACKAGES="add gitsync vanessa-runner stebi"
+ARG ONESCRIPT_PACKAGES="gitsync vanessa-runner"
 
 RUN wget https://github.com/${OVM_REPOSITORY_OWNER}/ovm/releases/download/${OVM_VERSION}/ovm.exe \
   && mv ovm.exe /usr/local/bin/ \
@@ -42,12 +43,23 @@ ENV OSCRIPTBIN=/root/.local/share/ovm/current/bin
 ENV PATH="$OSCRIPTBIN:$PATH"
 
 # Update and prepare oscript packages
-RUN opm install opm \
-  && opm update --all \
+# Bugfix opm для ${ONESCRIPT_VERSION} < 1.4.0
+RUN wget -O /tmp/opm.ospx https://github.com/${OVM_REPOSITORY_OWNER}/opm/releases/download/v0.16.2/opm-0.16.2.ospx \
+  && unzip /tmp/opm.ospx -d /tmp \
+  && unzip -o ./tmp/content.zip -d /root/.local/share/ovm/current/lib/opm \
+  && opm install -f /tmp/opm.ospx \
+  && rm -rf /tmp/*
+
+RUN opm update --all \
   && opm install ${ONESCRIPT_PACKAGES} \
   && gitsync plugins init \
+  && gitsync plugins enable increment \
   && gitsync plugins enable limit \
-  && gitsync plugins disable limit
+  && gitsync plugins enable sync-remote \
+  && gitsync plugins enable check-authors \
+  && gitsync plugins enable check-comments \
+  && gitsync plugins enable smart-tags \
+  && gitsync plugins enable unpackForm
 
 COPY ./oscript/docker-entrypoint.sh /
 RUN chmod 755 /docker-entrypoint.sh \

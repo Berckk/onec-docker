@@ -1,17 +1,14 @@
 ARG DOCKER_USERNAME=library
 ARG BASE_IMAGE=adoptopenjdk
-ARG BASE_TAG=14-hotspot
+ARG DOCKER_TAG=14-hotspot
 
-FROM ${DOCKER_USERNAME}/${BASE_IMAGE}:${BASE_TAG}
-
-LABEL maintainer="Nikita Gryzlov <NikGryzlov@1bit.com>, FirstBit"
+FROM ${DOCKER_USERNAME}/${BASE_IMAGE}:${DOCKER_TAG}
 
 ARG ONEC_USERNAME
 ARG ONEC_PASSWORD
-ARG EDT_VERSION=2020.2
+ARG ONEC_VERSION=2020.2
 
-ENV installer_type=edt \
-  ONEC_VERSION=${EDT_VERSION}
+ENV installer_type=edt
 
 COPY ./scripts/download.sh /download.sh
 
@@ -23,16 +20,11 @@ RUN apt-get update \
     curl \
     # edt dependencies
     libgtk-3-0 \
-    locales \
   && rm -rf  \
     /var/lib/apt/lists/* \
     /var/cache/debconf \
-    /tmp/* \
-  && localedef -i ru_RU -c -f UTF-8 -A /usr/share/locale/locale.alias ru_RU.UTF-8
+    /tmp/*
 
-ENV LANG ru_RU.UTF-8
-
-# Install EDT
 RUN chmod +x /download.sh \
   && sync; /download.sh \
   && for file in *.tar.gz; do tar -zxf "$file"; done \
