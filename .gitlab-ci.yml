@@ -8,6 +8,8 @@ stages:
   - build client
   - build vnc
   - build server
+  - build crs
+  - build crs-http
   - build oscript
   - test
   - release
@@ -15,6 +17,7 @@ stages:
 variables:
   DOCKER_USERNAME: $CI_REGISTRY_IMAGE
   BUILD_ALL: "false"
+  #CI_DEBUG_TRACE: "true"
 
 .common_release: &common_release
   script:
@@ -59,6 +62,29 @@ build:server:
     - if: '$INSTALLER_TYPE == "server"'
     - if: '$BUILD_ALL == "true"'
 
+build:crs:
+  stage: build crs
+  variables:
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/crs:$ONEC_VERSION
+  script:
+    - docker build --build-arg ONEC_USERNAME=$ONEC_USERNAME --build-arg ONEC_PASSWORD=$ONEC_PASSWORD --build-arg ONEC_VERSION=$ONEC_VERSION --pull -t $CONTAINER_TEST_IMAGE -f crs/Dockerfile .
+    - docker push $CONTAINER_TEST_IMAGE
+  rules:
+    - if: '$INSTALLER_TYPE == "crs"'
+    - if: '$BUILD_ALL == "true"'
+
+build:crs-http:
+  stage: build crs-http
+  variables:
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/crs-http:$ONEC_VERSION
+  script:
+    - docker build --build-arg ONEC_VERSION=$ONEC_VERSION --build-arg DOCKER_USERNAME=$DOCKER_USERNAME --pull -t $CONTAINER_TEST_IMAGE -f crs-apache/Dockerfile .
+    - docker push $CONTAINER_TEST_IMAGE
+  rules:
+    - if: '$INSTALLER_TYPE == "crs"'
+    - if: '$INSTALLER_TYPE == "crs-http"'
+    - if: '$BUILD_ALL == "true"'
+
 build:oscript:
   stage: build oscript
   variables:
@@ -92,9 +118,33 @@ run:server:
     CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/server:$ONEC_VERSION
   script:
     - docker pull $CONTAINER_TEST_IMAGE
-    - docker run --rm $CONTAINER_TEST_IMAGE bash -c exit
+    - docker run --rm $CONTAINER_TEST_IMAGE bash -c ls /home/usr1cv8/.1cv8
   rules:
     - if: '$INSTALLER_TYPE == "server"'
+    - if: '$BUILD_ALL == "true"'
+
+run:crs:
+  stage: test
+  variables:
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/crs:$ONEC_VERSION
+  script:
+    - docker pull $CONTAINER_TEST_IMAGE
+    - docker run --rm $CONTAINER_TEST_IMAGE ls /home/usr1cv8/.1cv8
+  rules:
+    - if: '$INSTALLER_TYPE == "crs"'
+    - if: '$BUILD_ALL == "true"'
+
+run:crs-http:
+  stage: test
+  variables:
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/crs-http:$ONEC_VERSION
+  script:
+    - docker pull $CONTAINER_TEST_IMAGE
+    - docker run --rm -d --name=test_$CI_COMMIT_SHORT_SHA $CONTAINER_TEST_IMAGE
+    - docker stop test_$CI_COMMIT_SHORT_SHA
+  rules:
+    - if: '$INSTALLER_TYPE == "crs"'
+    - if: '$INSTALLER_TYPE == "crs-http"'
     - if: '$BUILD_ALL == "true"'
 
 run:oscript:
@@ -127,6 +177,20 @@ push:server:
   variables:
     CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/server:$ONEC_VERSION
     CONTAINER_RELEASE_IMAGE: $CI_REGISTRY_IMAGE/server:latest
+  <<: *common_release
+
+push:crs:
+  stage: release
+  variables:
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/crs:$ONEC_VERSION
+    CONTAINER_RELEASE_IMAGE: $CI_REGISTRY_IMAGE/crs:latest
+  <<: *common_release
+
+push:crs-http:
+  stage: release
+  variables:
+    CONTAINER_TEST_IMAGE: $CI_REGISTRY_IMAGE/crs-http:$ONEC_VERSION
+    CONTAINER_RELEASE_IMAGE: $CI_REGISTRY_IMAGE/crs-http:latest
   <<: *common_release
 
 push:oscript:
